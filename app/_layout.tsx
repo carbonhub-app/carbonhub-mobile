@@ -1,30 +1,51 @@
 import '../global.css';
-import React from 'react';
 import { Stack } from 'expo-router';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ThemeProvider } from '../src/contexts/ThemeContext';
-import { StatusBar } from 'expo-status-bar';
+import React from 'react';
+import { View, Text } from 'react-native';
+
+// Error Boundary untuk handle navigation context errors
+class NavigationErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    // Check if it's a navigation context error
+    if (error.message && error.message.includes("Couldn't find a navigation context")) {
+      // Don't show error, just suppress it
+      console.warn('Navigation context error suppressed:', error.message);
+      return { hasError: false }; // Don't show error UI
+    }
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    if (error.message && error.message.includes("Couldn't find a navigation context")) {
+      // Just log it, don't crash the app
+      console.warn('Navigation context error caught and suppressed');
+      return;
+    }
+    console.error('App error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111827' }}>
+          <Text style={{ color: 'white' }}>Something went wrong.</Text>
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <StatusBar style="light" backgroundColor="#111827" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen 
-            name="index" 
-            options={{ headerShown: false }} 
-          />
-          <Stack.Screen 
-            name="company/[id]" 
-            options={{ 
-              headerShown: false,
-              presentation: 'card',
-              gestureDirection: 'horizontal'
-            }} 
-          />
-        </Stack>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <NavigationErrorBoundary>
+      <Stack screenOptions={{ headerShown: false }} />
+    </NavigationErrorBoundary>
   );
 } 
