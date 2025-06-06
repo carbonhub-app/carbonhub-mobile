@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Carbon Hub Mobile",
+    "name": "CarbonHub",
     "slug": "carbon-hub-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -29,6 +29,9 @@
       "favicon": "assets/icons/favicon.png",
       "bundler": "metro"
     },
-    "plugins": []
+    "scheme": "carbonhub",
+    "plugins": [
+      "expo-router"
+    ]
   }
 }

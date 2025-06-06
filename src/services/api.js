@@ -58,7 +58,10 @@ export const getCompanyDetail = async (companyId) => {
 export const getAnnualEmissions = async (companyId) => {
   try {
     console.log(`Fetching annual emissions for company ${companyId}`);
-    const response = await fetch(`${BASE_URL}/emission/annual/${companyId}`);
+    const url = `${BASE_URL}/emission/annual/${companyId}`;
+    console.log(`Annual emissions URL: ${url}`);
+    
+    const response = await fetch(url);
     const data = await handleResponse(response);
     console.log('Annual emissions data:', data);
     return data;
@@ -72,12 +75,17 @@ export const getAnnualEmissions = async (companyId) => {
 export const getMonthlyEmissions = async (companyId) => {
   try {
     console.log(`Fetching monthly emissions for company ${companyId}`);
-    const response = await fetch(`${BASE_URL}/emission/monthly/${companyId}`);
+    const url = `${BASE_URL}/emission/monthly/${companyId}`;
+    console.log(`Monthly emissions URL: ${url}`);
+    
+    const response = await fetch(url);
     const data = await handleResponse(response);
-    console.log('Monthly emissions data:', data);
+    console.log('Monthly emissions data received:', data);
+    console.log(`Monthly data count: ${data ? data.length : 0} items`);
     return data;
   } catch (error) {
     console.error('Error fetching monthly emissions:', error);
+    console.error('Error details:', error.message);
     throw error;
   }
 };
@@ -86,12 +94,17 @@ export const getMonthlyEmissions = async (companyId) => {
 export const getDailyEmissions = async (companyId) => {
   try {
     console.log(`Fetching daily emissions for company ${companyId}`);
-    const response = await fetch(`${BASE_URL}/emission/daily/${companyId}`);
+    const url = `${BASE_URL}/emission/daily/${companyId}`;
+    console.log(`Daily emissions URL: ${url}`);
+    
+    const response = await fetch(url);
     const data = await handleResponse(response);
-    console.log('Daily emissions data:', data);
+    console.log('Daily emissions data received:', data);
+    console.log(`Daily data count: ${data ? data.length : 0} items`);
     return data;
   } catch (error) {
     console.error('Error fetching daily emissions:', error);
+    console.error('Error details:', error.message);
     throw error;
   }
 }; 

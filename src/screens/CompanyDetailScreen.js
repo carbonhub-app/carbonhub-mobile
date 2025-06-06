@@ -1,26 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { getCompanyDetail, getAnnualEmissions, getMonthlyEmissions, getDailyEmissions } from '../services/api';
-import EmissionChart from '../components/EmissionChart';
+import SimpleChart from '../components/SimpleChart';
+import ErrorBoundary from '../components/ErrorBoundary';
 
-export default function CompanyDetailScreen({ route, navigation }) {
-  const { companyId, companyName } = route.params;
+export default function CompanyDetailScreen({ route }) {
+  const { companyId, companyName } = route.params || {};
   const [company, setCompany] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [chartLoading, setChartLoading] = useState(false);
   const [selectedTab, setSelectedTab] = useState('Annual');
+  const router = useRouter();
 
-  useEffect(() => {
-    loadCompanyDetail();
+  const handleTabChange = useCallback((newTab) => {
+    try {
+      console.log('Tab change requested:', newTab);
+      setSelectedTab(newTab);
+    } catch (error) {
+      console.error('Error changing tab:', error);
+    }
   }, []);
 
   useEffect(() => {
-    if (company) {
+    if (companyId) {
+      loadCompanyDetail();
+    }
+  }, [companyId]);
+
+  useEffect(() => {
+    if (company && companyId) {
       loadChartData();
     }
-  }, [selectedTab, company]);
+  }, [selectedTab, company, companyId]);
 
   const loadCompanyDetail = async () => {
     try {
@@ -34,7 +48,7 @@ export default function CompanyDetailScreen({ route, navigation }) {
     }
   };
 
-  const loadChartData = async () => {
+  const loadChartData = useCallback(async () => {
     if (!company) return;
     
     try {
@@ -45,29 +59,46 @@ export default function CompanyDetailScreen({ route, navigation }) {
       
       switch (selectedTab) {
         case 'Annual':
+          console.log('Fetching annual emissions...');
           data = await getAnnualEmissions(companyId);
           break;
         case 'Monthly':
+          console.log('Fetching monthly emissions...');
           data = await getMonthlyEmissions(companyId);
+          console.log('Monthly data format check:', data);
           break;
         case 'Daily':
+          console.log('Fetching daily emissions...');
           data = await getDailyEmissions(companyId);
+          console.log('Daily data format check:', data);
           break;
         default:
           data = company.annual_emissions || [];
       }
       
-      console.log(`${selectedTab} data loaded:`, data);
+      console.log(`${selectedTab} data loaded successfully:`, {
+        dataCount: data ? data.length : 0,
+        firstItem: data && data.length > 0 ? data[0] : null,
+        lastItem: data && data.length > 0 ? data[data.length - 1] : null
+      });
+      
+      // Ensure data is an array
+      if (!Array.isArray(data)) {
+        console.warn(`${selectedTab} data is not an array:`, data);
+        data = [];
+      }
+      
       setChartData(data);
     } catch (error) {
       console.error(`Error loading ${selectedTab} data:`, error);
+      console.error('Error stack:', error.stack);
       Alert.alert('Error', `Failed to load ${selectedTab.toLowerCase()} data: ${error.message}`);
       // Set empty data on error to prevent crash
       setChartData([]);
     } finally {
       setChartLoading(false);
     }
-  };
+  }, [company, selectedTab, companyId]);
 
   if (loading) {
     return (
@@ -144,7 +175,7 @@ export default function CompanyDetailScreen({ route, navigation }) {
       <View className="px-6 pt-16 pb-6 bg-gray-900">
         <View className="flex-row items-center justify-between mb-6">
           <TouchableOpacity
-            onPress={() => navigation.goBack()}
+            onPress={() => router.back()}
             className="flex-row items-center"
           >
             <Feather name="chevron-left" size={20} color="#3b82f6" />
@@ -266,33 +297,32 @@ export default function CompanyDetailScreen({ route, navigation }) {
           </View>
           
           {/* Tab Selector */}
-          <View className="flex-row bg-gray-800/60 rounded-xl p-2 border border-gray-700">
-            {['Annual', 'Monthly', 'Daily'].map((option) => (
-              <TouchableOpacity
-                key={option}
-                onPress={() => {
-                  console.log('Tab selected:', option);
-                  setSelectedTab(option);
-                }}
-                className={`flex-1 py-3 px-4 rounded-lg mx-1 ${
-                  selectedTab === option
-                    ? 'bg-blue-600 shadow-lg'
-                    : 'bg-transparent'
-                }`}
-                activeOpacity={0.7}
-              >
-                <Text
-                  className={`text-center font-semibold ${
+          <ErrorBoundary>
+            <View className="flex-row bg-gray-800/60 rounded-xl p-2 border border-gray-700">
+              {['Annual', 'Monthly', 'Daily'].map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  onPress={() => handleTabChange(option)}
+                  className={`flex-1 py-3 px-4 rounded-lg mx-1 ${
                     selectedTab === option
-                      ? 'text-white'
-                      : 'text-gray-400'
+                      ? 'bg-blue-600 shadow-lg'
+                      : 'bg-transparent'
                   }`}
+                  activeOpacity={0.7}
                 >
-                  {option}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+                  <Text
+                    className={`text-center font-semibold ${
+                      selectedTab === option
+                        ? 'text-white'
+                        : 'text-gray-400'
+                    }`}
+                  >
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ErrorBoundary>
         </View>
 
         {/* Chart Section */}
@@ -354,10 +384,12 @@ export default function CompanyDetailScreen({ route, navigation }) {
               </View>
 
               {/* Chart */}
-              <EmissionChart 
-                data={chartData}
-                period={selectedTab.toLowerCase()}
-              />
+              <ErrorBoundary>
+                <SimpleChart 
+                  data={chartData}
+                  period={selectedTab.toLowerCase()}
+                />
+              </ErrorBoundary>
             </>
           )}
         </View>

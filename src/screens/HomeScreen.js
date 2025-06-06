@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, Alert, RefreshControl, TouchableOpacity, TextInput } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { getCompanies } from '../services/api';
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen() {
   const [companies, setCompanies] = useState([]);
   const [filteredCompanies, setFilteredCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const router = useRouter();
 
   useEffect(() => {
     loadCompanies();
@@ -67,10 +69,7 @@ export default function HomeScreen({ navigation }) {
 
     return (
       <TouchableOpacity
-        onPress={() => navigation.navigate('CompanyDetail', { 
-          companyId: item.id,
-          companyName: item.name 
-        })}
+        onPress={() => router.push(`/company/${item.id}?name=${encodeURIComponent(item.name)}`)}
         className="mb-8 mx-4 p-6 rounded-2xl bg-gray-800/80 border border-gray-700"
         style={{
           shadowColor: '#000',
@@ -212,6 +211,12 @@ export default function HomeScreen({ navigation }) {
             onChangeText={setSearchText}
             className="text-base text-white flex-1 ml-4"
             placeholderTextColor="#9ca3af"
+            style={{
+              paddingVertical: 0,
+              textAlignVertical: 'center',
+              includeFontPadding: false,
+              lineHeight: 17
+            }}
           />
           {searchText.length > 0 && (
             <TouchableOpacity onPress={() => setSearchText('')}>

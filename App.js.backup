@@ -1,12 +1,11 @@
 import './global.css';
 import 'react-native-gesture-handler';
-import React, { useEffect } from 'react';
-import { LogBox } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { LogBox, View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { GluestackUIProvider } from './components/ui/gluestack-ui-provider';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import HomeScreen from './src/screens/HomeScreen';
 import CompanyDetailScreen from './src/screens/CompanyDetailScreen';
@@ -15,15 +14,18 @@ import CompanyDetailScreen from './src/screens/CompanyDetailScreen';
 LogBox.ignoreLogs([
   'Couldn\'t find a navigation context',
   'Warning: Error: Couldn\'t find a navigation context',
+  'Tried to register two views with the same name',
+  'VirtualizedLists should never be nested',
 ]);
 
 const Stack = createStackNavigator();
 
-const AppNavigator = () => {
+// Inner component that uses theme context
+function ThemedAppStack() {
   const { theme, isDark } = useTheme();
 
   return (
-    <GluestackUIProvider mode={theme}>
+    <>
       <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor="#111827" />
       <Stack.Navigator
         initialRouteName="Home"
@@ -50,31 +52,47 @@ const AppNavigator = () => {
           }}
         />
       </Stack.Navigator>
-    </GluestackUIProvider>
+    </>
   );
-};
+}
 
-const AppContent = () => {
+// Navigation wrapper component
+const Navigation = () => {
+  const navigationRef = useRef();
+  const [isNavigationReady, setIsNavigationReady] = useState(false);
+
   useEffect(() => {
-    // Ensure gesture handler is properly initialized
-    console.log('App initialized with navigation');
+    // Cleanup function
+    return () => {
+      setIsNavigationReady(false);
+    };
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#111827' }} edges={['top']}>
-        <NavigationContainer>
-          <AppNavigator />
-        </NavigationContainer>
-      </SafeAreaView>
-    </SafeAreaProvider>
+    <NavigationContainer
+      ref={navigationRef}
+      onReady={() => {
+        console.log('NavigationContainer is ready');
+        setIsNavigationReady(true);
+      }}
+      onStateChange={(state) => {
+        // Optional: Log navigation state changes for debugging
+        if (__DEV__) {
+          console.log('Navigation state changed:', state);
+        }
+      }}
+    >
+      <ThemeProvider>
+        <ThemedAppStack />
+      </ThemeProvider>
+    </NavigationContainer>
   );
 };
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <Navigation />
+    </SafeAreaProvider>
   );
 }

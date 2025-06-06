@@ -1,7 +1,7 @@
 {
   "name": "carbon-hub-mobile",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "android": "DARK_MODE=media expo start --android",
@@ -50,7 +50,6 @@
     "babel-plugin-module-resolver": "^5.0.2",
     "expo": "~53.0.10",
     "expo-linear-gradient": "~14.1.5",
-    "expo-router": "^5.0.7",
     "expo-status-bar": "~2.2.3",
     "nativewind": "^4.1.23",
     "react": "19.0.0",
@@ -58,13 +57,15 @@
     "react-native": "0.79.3",
     "react-native-css-interop": "^0.1.22",
     "react-native-gesture-handler": "~2.24.0",
-    "react-native-gifted-charts": "^1.4.61",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-svg": "^15.11.2",
     "react-native-vector-icons": "^10.2.0",
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "^3.4.17",
+    "expo-router": "~5.0.7",
+    "expo-linking": "~7.1.5",
+    "expo-constants": "~17.1.6"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
