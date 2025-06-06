@@ -1,31 +1,40 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { getCompanyDetail, getAnnualEmissions, getMonthlyEmissions, getDailyEmissions } from '../../lib/services/api';
+import { getCompanyDetail, getMonthlyEmissions, getDailyEmissions } from '../../lib/services/api';
 import SimpleChart from '../../lib/components/SimpleChart';
 
+// Safe hooks with error handling
+function useSafeRouter() {
+  try {
+    const { useRouter } = require('expo-router');
+    return useRouter();
+  } catch (error) {
+    return { back: () => console.log('Router back called') };
+  }
+}
+
+function useSafeParams() {
+  try {
+    const { useLocalSearchParams } = require('expo-router');
+    return useLocalSearchParams();
+  } catch (error) {
+    return { id: '1', name: 'Default Company' };
+  }
+}
+
 export default function CompanyDetailPage() {
-  const { id: companyId, name: companyName } = useLocalSearchParams();
   const [company, setCompany] = useState(null);
-  const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [chartLoading, setChartLoading] = useState(false);
-  const [selectedTab, setSelectedTab] = useState('Annual');
-  const router = useRouter();
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [dailyData, setDailyData] = useState([]);
   
-  // Ensure id and name are strings (not arrays)
+  const router = useSafeRouter();
+  const params = useSafeParams();
+  
+  const { id: companyId, name: companyName } = params;
   const cleanCompanyId = Array.isArray(companyId) ? companyId[0] : companyId;
   const cleanCompanyName = Array.isArray(companyName) ? companyName[0] : companyName;
-
-  const handleTabChange = useCallback((newTab) => {
-    try {
-      console.log('Tab change requested:', newTab);
-      setSelectedTab(newTab);
-    } catch (error) {
-      console.error('Error changing tab:', error);
-    }
-  }, []);
 
   useEffect(() => {
     if (cleanCompanyId) {
@@ -33,17 +42,17 @@ export default function CompanyDetailPage() {
     }
   }, [cleanCompanyId]);
 
-  useEffect(() => {
-    if (company && cleanCompanyId) {
-      loadChartData();
-    }
-  }, [selectedTab, company, cleanCompanyId]);
-
   const loadCompanyDetail = async () => {
     try {
-      const response = await getCompanyDetail(cleanCompanyId);
-      setCompany(response.data);
-      setChartData(response.data.annual_emissions || []);
+      const [companyResponse, monthlyResponse, dailyResponse] = await Promise.all([
+        getCompanyDetail(cleanCompanyId),
+        getMonthlyEmissions(cleanCompanyId),
+        getDailyEmissions(cleanCompanyId)
+      ]);
+      
+      setCompany(companyResponse.data);
+      setMonthlyData(monthlyResponse.data || []);
+      setDailyData(dailyResponse.data || []);
     } catch (error) {
       Alert.alert('Error', 'Failed to load company details');
     } finally {
@@ -51,63 +60,11 @@ export default function CompanyDetailPage() {
     }
   };
 
-  const loadChartData = useCallback(async () => {
-    if (!company) return;
-    
-    try {
-      setChartLoading(true);
-      let data = [];
-      
-      console.log(`Loading ${selectedTab} data for company ${cleanCompanyId}`);
-      
-      switch (selectedTab) {
-        case 'Annual':
-          console.log('Fetching annual emissions...');
-          data = await getAnnualEmissions(cleanCompanyId);
-          break;
-        case 'Monthly':
-          console.log('Fetching monthly emissions...');
-          data = await getMonthlyEmissions(cleanCompanyId);
-          console.log('Monthly data format check:', data);
-          break;
-        case 'Daily':
-          console.log('Fetching daily emissions...');
-          data = await getDailyEmissions(cleanCompanyId);
-          console.log('Daily data format check:', data);
-          break;
-        default:
-          data = company.annual_emissions || [];
-      }
-      
-      console.log(`${selectedTab} data loaded successfully:`, {
-        dataCount: data ? data.length : 0,
-        firstItem: data && data.length > 0 ? data[0] : null,
-        lastItem: data && data.length > 0 ? data[data.length - 1] : null
-      });
-      
-      // Ensure data is an array
-      if (!Array.isArray(data)) {
-        console.warn(`${selectedTab} data is not an array:`, data);
-        data = [];
-      }
-      
-      setChartData(data);
-    } catch (error) {
-      console.error(`Error loading ${selectedTab} data:`, error);
-      console.error('Error stack:', error.stack);
-      Alert.alert('Error', `Failed to load ${selectedTab.toLowerCase()} data: ${error.message}`);
-      // Set empty data on error to prevent crash
-      setChartData([]);
-    } finally {
-      setChartLoading(false);
-    }
-  }, [company, selectedTab, cleanCompanyId]);
-
   if (loading) {
     return (
-      <View className="flex-1 justify-center items-center bg-gray-900">
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111827' }}>
         <Feather name="loader" size={32} color="#3b82f6" />
-        <Text className="text-base text-gray-300 mt-4">
+        <Text style={{ fontSize: 16, color: '#d1d5db', marginTop: 16 }}>
           Loading company details...
         </Text>
       </View>
@@ -116,9 +73,9 @@ export default function CompanyDetailPage() {
 
   if (!company) {
     return (
-      <View className="flex-1 justify-center items-center bg-gray-900">
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111827' }}>
         <Feather name="alert-circle" size={48} color="#ef4444" />
-        <Text className="text-lg text-gray-300 mt-4 text-center px-6">
+        <Text style={{ fontSize: 18, color: '#d1d5db', marginTop: 16, textAlign: 'center', paddingHorizontal: 24 }}>
           Company not found
         </Text>
       </View>
@@ -129,22 +86,14 @@ export default function CompanyDetailPage() {
   const emissions = company.annual_emissions || [];
   const totalEmissions = emissions.reduce((sum, emission) => sum + emission.totalTon, 0);
   const avgEmissions = emissions.length > 0 ? totalEmissions / emissions.length : 0;
-  const maxEmissions = Math.max(...emissions.map(e => e.totalTon), 0);
-  const minEmissions = Math.min(...emissions.map(e => e.totalTon), 0);
 
   const sustainabilityScore = totalEmissions < 0.1 ? 8.5 : 
                              totalEmissions < 1 ? 6.0 : 3.5;
   
   const getScoreColor = (score) => {
-    if (score >= 8) return '#10b981'; // Green
-    if (score >= 6) return '#f59e0b'; // Yellow
-    return '#ef4444'; // Red
-  };
-
-  const getSustainabilityStatus = (score) => {
-    if (score >= 8) return 'Excellent';
-    if (score >= 6) return 'Good';
-    return 'Needs Improvement';
+    if (score >= 8) return '#10b981';
+    if (score >= 6) return '#f59e0b';
+    return '#ef4444';
   };
 
   const getTrendStatus = () => {
@@ -152,15 +101,6 @@ export default function CompanyDetailPage() {
     const recent = emissions[emissions.length - 1].totalTon;
     const previous = emissions[emissions.length - 2].totalTon;
     return recent < previous ? 'Improving' : recent > previous ? 'Declining' : 'Stable';
-  };
-
-  const getTrendIcon = (trend) => {
-    switch (trend) {
-      case 'Improving': return 'trending-down';
-      case 'Declining': return 'trending-up';
-      case 'Stable': return 'minus';
-      default: return 'minus';
-    }
   };
 
   const getTrendColor = (trend) => {
@@ -173,223 +113,267 @@ export default function CompanyDetailPage() {
   };
 
   return (
-    <View className="flex-1 bg-gray-900">
+    <View style={{ flex: 1, backgroundColor: '#111827' }}>
       {/* Header */}
-      <View className="px-6 pt-16 pb-6 bg-gray-900">
-        <View className="flex-row items-center justify-between mb-6">
+      <View style={{ paddingHorizontal: 24, paddingTop: 64, paddingBottom: 24, backgroundColor: '#111827' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <TouchableOpacity
             onPress={() => router.back()}
-            className="flex-row items-center"
+            style={{ flexDirection: 'row', alignItems: 'center' }}
           >
             <Feather name="chevron-left" size={20} color="#3b82f6" />
-            <Text className="text-base text-blue-500 ml-2">Back</Text>
+            <Text style={{ fontSize: 16, color: '#3b82f6', marginLeft: 8 }}>Back</Text>
           </TouchableOpacity>
         </View>
         
-        <View className="flex-row items-center">
-          <Feather name="users" size={24} color="#10b981" />
-          <Text className="text-2xl font-bold text-white ml-3">
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Feather name="home" size={24} color="#10b981" />
+          <Text style={{ fontSize: 24, fontWeight: 'bold', color: 'white', marginLeft: 12 }}>
             {cleanCompanyName}
           </Text>
         </View>
+        
+        <Text style={{ fontSize: 16, color: '#9ca3af', marginTop: 8, marginLeft: 36 }}>
+          Carbon Emissions Overview
+        </Text>
       </View>
 
       <ScrollView 
-        className="flex-1"
+        style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 32 }}
       >
-        {/* Sustainability Overview Card */}
-        <View className="mx-6 mb-8 p-6 rounded-2xl bg-gray-800/80 border border-gray-700">
-          <View className="flex-row items-center mb-4">
-            <Feather name="shield" size={20} color="#10b981" />
-            <Text className="text-xl font-bold text-white ml-3">
-              Sustainability Overview
+        {/* Sustainability Score Card */}
+        <View style={{ 
+          marginHorizontal: 24, 
+          marginBottom: 32, 
+          padding: 24, 
+          borderRadius: 16, 
+          backgroundColor: '#1f2937',
+          borderWidth: 1,
+          borderColor: '#374151'
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            <Feather name="award" size={20} color="#10b981" />
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'white', marginLeft: 12 }}>
+              Sustainability Score
             </Text>
           </View>
           
-          <Text className="text-gray-400 mb-6">
-            Current performance metrics and environmental impact
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            <Text style={{ 
+              fontSize: 32, 
+              fontWeight: 'bold', 
+              color: getScoreColor(sustainabilityScore) 
+            }}>
+              {sustainabilityScore}
+            </Text>
+            <Text style={{ fontSize: 20, color: '#9ca3af', marginLeft: 4 }}>/10</Text>
+            <View style={{ 
+              marginLeft: 16, 
+              paddingHorizontal: 12, 
+              paddingVertical: 4, 
+              borderRadius: 8,
+              backgroundColor: getScoreColor(sustainabilityScore) + '20'
+            }}>
+              <Text style={{ fontSize: 12, color: getScoreColor(sustainabilityScore), fontWeight: 'bold' }}>
+                {getTrendStatus()}
+              </Text>
+            </View>
+          </View>
           
           {/* Progress Bar */}
-          <View className="mb-6">
-            <View className="flex-row items-center justify-between mb-3">
-              <View className="flex-row items-center">
-                <Feather name="award" size={14} color={getScoreColor(sustainabilityScore)} />
-                <Text className="text-base font-semibold ml-2" style={{ color: getScoreColor(sustainabilityScore) }}>
-                  {sustainabilityScore}/10
-                </Text>
-              </View>
-            </View>
-            
-            <View className="h-3 rounded-full bg-gray-700">
-              <View 
-                className="h-3 rounded-full"
-                style={{ 
-                  width: `${sustainabilityScore * 10}%`,
-                  backgroundColor: getScoreColor(sustainabilityScore)
-                }}
-              />
-            </View>
+          <View style={{ height: 8, borderRadius: 4, backgroundColor: '#374151', marginBottom: 16 }}>
+            <View style={{ 
+              height: 8, 
+              borderRadius: 4,
+              width: `${sustainabilityScore * 10}%`,
+              backgroundColor: getScoreColor(sustainabilityScore)
+            }} />
           </View>
           
-          <View className="flex-row items-center">
-            <Feather name="minus" size={14} color="#6b7280" />
-            <Text className="text-sm text-gray-400 ml-2">
-              Trend: {getTrendStatus()}
-            </Text>
-          </View>
+          <Text style={{ fontSize: 14, color: '#9ca3af' }}>
+            Based on total emissions of {totalEmissions.toFixed(3)} tons CO₂
+          </Text>
         </View>
 
-        {/* Statistics Cards */}
-        <View className="px-6 mb-8">
-          <View className="flex-row justify-between">
-            <View className="flex-1 p-4 rounded-xl bg-gray-800/50 border border-gray-700 mr-2">
-              <View className="items-center">
-                <Feather name="globe" size={18} color="#3b82f6" />
-                <Text className="text-sm font-bold text-white mt-2">
-                  {totalEmissions.toFixed(3)}t
-                </Text>
-                <Text className="text-xs text-gray-400 text-center mt-1">
-                  Total CO₂
-                </Text>
-              </View>
-            </View>
-            
-            <View className="flex-1 p-4 rounded-xl bg-gray-800/50 border border-gray-700 mx-1">
-              <View className="items-center">
-                <Feather name="bar-chart" size={18} color="#f59e0b" />
-                <Text className="text-sm font-bold text-white mt-2">
-                  {avgEmissions.toFixed(3)}t
-                </Text>
-                <Text className="text-xs text-gray-400 text-center mt-1">
-                  Average
-                </Text>
-              </View>
-            </View>
-            
-            <View className="flex-1 p-4 rounded-xl bg-gray-800/50 border border-gray-700 ml-2">
-              <View className="items-center">
-                <Feather 
-                  name={getTrendIcon(getTrendStatus())} 
-                  size={18} 
-                  color={getTrendColor(getTrendStatus())} 
-                />
-                <Text 
-                  className="text-sm font-bold mt-2"
-                  style={{ color: getTrendColor(getTrendStatus()) }}
-                >
-                  {getTrendStatus()}
-                </Text>
-                <Text className="text-xs text-gray-400 text-center mt-1">
-                  Trend
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Emission Analytics Section */}
-        <View className="px-6 mb-8">
-          <View className="flex-row items-center mb-6">
-            <Feather name="activity" size={20} color="#10b981" />
-            <Text className="text-xl font-bold text-white ml-3">
-              Emission Analytics
-            </Text>
-          </View>
+        {/* Emissions Statistics */}
+        <View style={{ marginHorizontal: 24, marginBottom: 32 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: 'white', marginBottom: 16 }}>
+            Emissions Statistics
+          </Text>
           
-          {/* Tab Selector */}
-          <View className="flex-row bg-gray-800/60 rounded-xl p-2 border border-gray-700">
-              {['Annual', 'Monthly', 'Daily'].map((option) => (
-                <TouchableOpacity
-                  key={option}
-                  onPress={() => handleTabChange(option)}
-                  className={`flex-1 py-3 px-4 rounded-lg mx-1 ${
-                    selectedTab === option
-                      ? 'bg-blue-600 shadow-lg'
-                      : 'bg-transparent'
-                  }`}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    className={`text-center font-semibold ${
-                      selectedTab === option
-                        ? 'text-white'
-                        : 'text-gray-400'
-                    }`}
-                  >
-                    {option}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-        </View>
-
-        {/* Chart Section */}
-        <View className="mx-6 mb-8 p-6 rounded-2xl bg-gray-800/80 border border-gray-700">
-          <View className="flex-row items-center justify-between mb-6">
-            <View className="flex-row items-center">
-              <Feather name="trending-up" size={18} color="#3b82f6" />
-              <Text className="text-lg font-bold text-white ml-3">
-                {selectedTab} Emissions
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ 
+              flex: 1, 
+              padding: 16, 
+              borderRadius: 12, 
+              backgroundColor: '#1f2937',
+              marginRight: 8,
+              borderWidth: 1,
+              borderColor: '#374151'
+            }}>
+              <Feather name="globe" size={18} color="#3b82f6" style={{ alignSelf: 'center', marginBottom: 8 }} />
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: 'white', textAlign: 'center' }}>
+                {totalEmissions.toFixed(3)}t
+              </Text>
+              <Text style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', marginTop: 4 }}>
+                Total CO₂
               </Text>
             </View>
-            <View className="flex-row items-center">
-              <Feather name="info" size={14} color="#6b7280" />
-              <Text className="text-xs text-gray-400 ml-2">
-                CO₂ Tons
+            
+            <View style={{ 
+              flex: 1, 
+              padding: 16, 
+              borderRadius: 12, 
+              backgroundColor: '#1f2937',
+              marginLeft: 8,
+              borderWidth: 1,
+              borderColor: '#374151'
+            }}>
+              <Feather name="bar-chart" size={18} color="#f59e0b" style={{ alignSelf: 'center', marginBottom: 8 }} />
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: 'white', textAlign: 'center' }}>
+                {avgEmissions.toFixed(3)}t
+              </Text>
+              <Text style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', marginTop: 4 }}>
+                Average
               </Text>
             </View>
           </View>
+        </View>
 
-          {/* Loading indicator for chart */}
-          {chartLoading ? (
-            <View className="h-40 justify-center items-center">
-              <Feather name="loader" size={24} color="#3b82f6" />
-              <Text className="text-gray-400 mt-2">Loading {selectedTab.toLowerCase()} data...</Text>
+        {/* Annual Emissions Chart */}
+        <View style={{ 
+          marginHorizontal: 24, 
+          marginBottom: 32, 
+          padding: 24, 
+          borderRadius: 16, 
+          backgroundColor: '#1f2937',
+          borderWidth: 1,
+          borderColor: '#374151'
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+            <Feather name="trending-up" size={20} color="#3b82f6" />
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'white', marginLeft: 12 }}>
+              Annual Carbon Footprint
+            </Text>
+          </View>
+          
+          <Text style={{ fontSize: 14, color: '#9ca3af', marginBottom: 20 }}>
+            Historical emissions data showing environmental impact trends
+          </Text>
+
+          {/* Chart Statistics */}
+          {emissions.length > 0 && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 }}>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>Max</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#ef4444' }}>
+                  {Math.max(...emissions.map(e => e.totalTon)).toFixed(3)}t
+                </Text>
+              </View>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>Min</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#10b981' }}>
+                  {Math.min(...emissions.map(e => e.totalTon)).toFixed(3)}t
+                </Text>
+              </View>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>Years</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#3b82f6' }}>
+                  {emissions.length}
+                </Text>
+              </View>
             </View>
+          )}
+
+          {/* Chart */}
+          {emissions.length > 0 ? (
+            <SimpleChart 
+              data={emissions}
+              period="annual"
+            />
           ) : (
-            <>
-              {/* Statistics Row */}
-              <View className="flex-row justify-between mb-6">
-                <View className="items-center">
-                  <View className="flex-row items-center mb-2">
-                    <Feather name="arrow-up" size={12} color="#ef4444" />
-                    <Text className="text-xs text-gray-400 ml-1">Max</Text>
-                  </View>
-                  <Text className="text-sm font-bold text-white">
-                    {chartData.length > 0 ? Math.max(...chartData.map(e => e.totalTon)).toFixed(3) : '0.000'}t
-                  </Text>
-                </View>
-                
-                <View className="items-center">
-                  <View className="flex-row items-center mb-2">
-                    <Feather name="arrow-down" size={12} color="#10b981" />
-                    <Text className="text-xs text-gray-400 ml-1">Min</Text>
-                  </View>
-                  <Text className="text-sm font-bold text-white">
-                    {chartData.length > 0 ? Math.min(...chartData.map(e => e.totalTon)).toFixed(3) : '0.000'}t
-                  </Text>
-                </View>
-                
-                <View className="items-center">
-                  <View className="flex-row items-center mb-2">
-                    <Feather name="bar-chart" size={12} color="#f59e0b" />
-                    <Text className="text-xs text-gray-400 ml-1">Avg</Text>
-                  </View>
-                  <Text className="text-sm font-bold text-white">
-                    {chartData.length > 0 ? (chartData.reduce((sum, e) => sum + e.totalTon, 0) / chartData.length).toFixed(3) : '0.000'}t
-                  </Text>
-                </View>
-              </View>
+            <View style={{ height: 200, justifyContent: 'center', alignItems: 'center' }}>
+              <Feather name="bar-chart-2" size={48} color="#374151" />
+              <Text style={{ fontSize: 16, color: '#9ca3af', marginTop: 16 }}>
+                No emissions data available
+              </Text>
+            </View>
+          )}
+        </View>
 
-              {/* Chart */}
-              <SimpleChart 
-                data={chartData}
-                period={selectedTab.toLowerCase()}
-              />
-            </>
+        {/* Monthly Emissions Chart */}
+        <View style={{ 
+          marginHorizontal: 24, 
+          marginBottom: 32, 
+          padding: 24, 
+          borderRadius: 16, 
+          backgroundColor: '#1f2937',
+          borderWidth: 1,
+          borderColor: '#374151'
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+            <Feather name="calendar" size={20} color="#f59e0b" />
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'white', marginLeft: 12 }}>
+              Monthly Carbon Footprint
+            </Text>
+          </View>
+          
+          <Text style={{ fontSize: 14, color: '#9ca3af', marginBottom: 20 }}>
+            Monthly breakdown of emissions showing seasonal patterns
+          </Text>
+
+          {/* Chart */}
+          {monthlyData.length > 0 ? (
+            <SimpleChart 
+              data={monthlyData}
+              period="monthly"
+            />
+          ) : (
+            <View style={{ height: 200, justifyContent: 'center', alignItems: 'center' }}>
+              <Feather name="bar-chart-2" size={48} color="#374151" />
+              <Text style={{ fontSize: 16, color: '#9ca3af', marginTop: 16 }}>
+                No monthly data available
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Daily Emissions Chart */}
+        <View style={{ 
+          marginHorizontal: 24, 
+          marginBottom: 32, 
+          padding: 24, 
+          borderRadius: 16, 
+          backgroundColor: '#1f2937',
+          borderWidth: 1,
+          borderColor: '#374151'
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+            <Feather name="clock" size={20} color="#ef4444" />
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'white', marginLeft: 12 }}>
+              Daily Carbon Footprint
+            </Text>
+          </View>
+          
+          <Text style={{ fontSize: 14, color: '#9ca3af', marginBottom: 20 }}>
+            Daily emissions tracking for detailed monitoring
+          </Text>
+
+          {/* Chart */}
+          {dailyData.length > 0 ? (
+            <SimpleChart 
+              data={dailyData}
+              period="daily"
+            />
+          ) : (
+            <View style={{ height: 200, justifyContent: 'center', alignItems: 'center' }}>
+              <Feather name="bar-chart-2" size={48} color="#374151" />
+              <Text style={{ fontSize: 16, color: '#9ca3af', marginTop: 16 }}>
+                No daily data available
+              </Text>
+            </View>
           )}
         </View>
       </ScrollView>
