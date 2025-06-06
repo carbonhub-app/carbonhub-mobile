@@ -27,11 +27,41 @@ export const getCompanies = async () => {
   }
 };
 
+// Get specific company details with annual emissions
+export const getCompanyDetail = async (companyId) => {
+  try {
+    // Get company basic info from companies list
+    const allCompanies = await getCompanies();
+    const company = allCompanies.find(c => c.id === parseInt(companyId) || c.id === companyId);
+    
+    if (!company) {
+      throw new Error('Company not found');
+    }
+
+    // Get annual emissions data for this company
+    const annualData = await getAnnualEmissions(companyId);
+    
+    // Combine company info with annual emissions
+    return {
+      data: {
+        ...company,
+        annual_emissions: annualData
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching company detail:', error);
+    throw error;
+  }
+};
+
 // Get annual emissions for a specific company
 export const getAnnualEmissions = async (companyId) => {
   try {
+    console.log(`Fetching annual emissions for company ${companyId}`);
     const response = await fetch(`${BASE_URL}/emission/annual/${companyId}`);
-    return await handleResponse(response);
+    const data = await handleResponse(response);
+    console.log('Annual emissions data:', data);
+    return data;
   } catch (error) {
     console.error('Error fetching annual emissions:', error);
     throw error;
@@ -41,8 +71,11 @@ export const getAnnualEmissions = async (companyId) => {
 // Get monthly emissions for a specific company
 export const getMonthlyEmissions = async (companyId) => {
   try {
+    console.log(`Fetching monthly emissions for company ${companyId}`);
     const response = await fetch(`${BASE_URL}/emission/monthly/${companyId}`);
-    return await handleResponse(response);
+    const data = await handleResponse(response);
+    console.log('Monthly emissions data:', data);
+    return data;
   } catch (error) {
     console.error('Error fetching monthly emissions:', error);
     throw error;
@@ -52,8 +85,11 @@ export const getMonthlyEmissions = async (companyId) => {
 // Get daily emissions for a specific company
 export const getDailyEmissions = async (companyId) => {
   try {
+    console.log(`Fetching daily emissions for company ${companyId}`);
     const response = await fetch(`${BASE_URL}/emission/daily/${companyId}`);
-    return await handleResponse(response);
+    const data = await handleResponse(response);
+    console.log('Daily emissions data:', data);
+    return data;
   } catch (error) {
     console.error('Error fetching daily emissions:', error);
     throw error;

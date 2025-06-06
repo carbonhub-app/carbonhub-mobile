@@ -1,34 +1,28 @@
 import React from 'react';
-import { View, TouchableOpacity, Text } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 
-export default function TabSelector({ options, selectedOption, onSelect, theme }) {
-  const isDark = theme === 'dark';
-  
+export default function TabSelector({ options, selectedOption, onSelect }) {
   return (
-    <View className={`flex-row p-1 rounded-lg ${
-      isDark ? 'bg-secondary-800' : 'bg-secondary-100'
-    }`}>
+    <View className="flex-row bg-gray-800/60 rounded-xl p-2 border border-gray-700">
       {options.map((option) => (
         <TouchableOpacity
-          key={option.value}
-          className={`flex-1 py-3 px-4 rounded-md mx-1 ${
-            selectedOption === option.value
-              ? isDark 
-                ? 'bg-primary-600 shadow-sm' 
-                : 'bg-primary-500 shadow-sm'
+          key={option}
+          onPress={() => onSelect(option)}
+          className={`flex-1 py-3 px-4 rounded-lg mx-1 ${
+            selectedOption === option
+              ? 'bg-blue-600 shadow-lg'
               : 'bg-transparent'
           }`}
-          onPress={() => onSelect(option.value)}
           activeOpacity={0.7}
         >
-          <Text className={`text-center font-medium ${
-            selectedOption === option.value
-              ? 'text-white'
-              : isDark 
-                ? 'text-secondary-300' 
-                : 'text-secondary-600'
-          }`}>
-            {option.label}
+          <Text
+            className={`text-center font-semibold ${
+              selectedOption === option
+                ? 'text-white'
+                : 'text-gray-400'
+            }`}
+          >
+            {option}
           </Text>
         </TouchableOpacity>
       ))}
